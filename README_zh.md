@@ -1,3 +1,5 @@
+[EN](README.md) | [中文版本](README_zh.md)
+
 # Moss Audio Tokenizer ONNX
 
 ![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)
