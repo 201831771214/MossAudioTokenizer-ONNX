@@ -25,20 +25,26 @@ MOSSAudioTokenizer 是一种基于 Cat（Causal Audio Tokenizer with Transformer
 
 ![架构图](./rep_sources/arch.png)
 
-## 开源模型仓库
+## 开源仓库
 
  - ModelScope: [https://www.modelscope.cn/models/KeanuX/MossAudioTokenizer-ONNX](https://www.modelscope.cn/models/KeanuX/MossAudioTokenizer-ONNX)
 
-### Git仓库结构
+ - GitHub: [https://github.com/201831771214/MossAudioTokenizer-ONNX.git](https://github.com/201831771214/MossAudioTokenizer-ONNX.git)
 
-#### Clone仓库
+## Clone 仓库
 
 ```shell
+# 获取仓库源码
 git clone https://github.com/201831771214/MossAudioTokenizer-ONNX.git
+
+# 获取模型
+modelscope download --model KeanuX/MossAudioTokenizer-ONNX --local_dir ./
 ```
 
+### Git仓库结构
+
 ```shell
-./MossAudioTokenizerDecoder-ONNX/
+../../VCProjects/MossAudioTokenizerDecoder-ONNX/
 ├── audio_tokens.npy
 ├── check_onnx.py
 ├── export_audio_tokenizer.py
@@ -51,8 +57,10 @@ git clone https://github.com/201831771214/MossAudioTokenizer-ONNX.git
 │   └── run_onnx.log
 ├── models
 │   └── moss_audio_tokenizer_decoder_onnx
+│       ├── 2005f62a-1458-11f1-80d4-cc28aa3bf0f5.data
+│       ├── 2799b6f6-1458-11f1-80d4-cc28aa3bf0f5.data
 │       ├── audio_tokenizer_decoder.onnx
-│       └── f73227e2-1442-11f1-80d4-cc28aa3bf0f5.data
+│       └── audio_tokenizer_encoder.onnx
 ├── moss_audio_tokenizer
 │   ├── config.json
 │   ├── configuration_moss_audio_tokenizer.py
@@ -76,16 +84,21 @@ git clone https://github.com/201831771214/MossAudioTokenizer-ONNX.git
 │   └── requirements.txt
 ├── moss_extra
 │   ├── audio_tokenizer_decoder.py
-│   └── __pycache__
-│       └── audio_tokenizer_decoder.cpython-310.pyc
-├── README.md
+│   └── audio_tokenizer_encoder.py
+├── README_Git.md
 ├── README_ModelScope.md
 ├── rep_sources
-│   └── arch.png
+│   ├── arch.png
+│   ├── License-MIT-yellow.png
+│   ├── NumPy-1.26.4-blue.png
+│   ├── ONNX-1.20.1-green.png
+│   ├── Onnx Runtime-1.23.2-blue.png
+│   └── Python-3.10+-blue.png
 ├── requirements.txt
-└── run_onnx.py
+├── run_decoder.py
+└── run_encoder.py
 
-12 directories, 34 files
+11 directories, 42 files
 ```
 
 ## 使用方法
@@ -93,6 +106,7 @@ git clone https://github.com/201831771214/MossAudioTokenizer-ONNX.git
 ### 模型信息
 
 ```txt
+#### Audio Decoder Infos ####
 ============================================================
 ONNX模型基本信息
 ============================================================
@@ -115,6 +129,38 @@ Input 1: audio_codes
 Output 1: audio
   数据类型: float32
   形状: [0, 0]
+
+#### Audio Encoder Infos ####
+============================================================
+ONNX模型基本信息
+============================================================
+模型文件路径: ./models/moss_audio_tokenizer_decoder_onnx/audio_tokenizer_encoder.onnx
+ONNX版本: 7
+生产者信息: pytorch 2.8.0
+模型版本: 0
+描述: 
+
+============================================================
+模型输入信息 (共 1 个输入)
+============================================================
+Input 1: input_values
+  数据类型: float32
+  形状: [0, 0, 0]
+
+============================================================
+模型输出信息 (共 3 个输出)
+============================================================
+Output 1: audio_codes
+  数据类型: int64
+  形状: [32, 0, 0]
+
+Output 2: audio_codes_lengths
+  数据类型: int64
+  形状: [0]
+
+Output 3: encoder_hidden_states
+  数据类型: float32
+  形状: [0, 768, 0]
 ```
 
 详细信息请参考: [ONNX模型信息](https://github.com/201831771214/MossAudioTokenizer-ONNX/infos/)
@@ -212,7 +258,7 @@ class AudioTokenizerDecoder:
         return full_audio, 24000
     
 test_audio_tokens = "./audio_tokens.npy"
-model_path = "./models/moss_tts/audio_tokenizer_decoder.onnx"
+model_path = "./models/moss_audio_tokenizer_decoder_onnx/audio_tokenizer_decoder.onnx"
 output_path = "generated_audio.wav"
 
 if __name__ == "__main__":
@@ -232,3 +278,14 @@ if __name__ == "__main__":
     logger.info(f"Audio waveform saved to {output_path} with sample rate {sample_rate}")
 ```
 
+### Decode Audio Tokens Result
+
+ - 生成的音频文件: [generated_audio.wav](https://github.com/201831771214/MossAudioTokenizer-ONNX/blob/main/generated_audio.wav)
+
+ - Audio Text: "MOSS-TTS-Realtime 是一个上下文感知、多轮次流式 TTS 模型，专为实时语音智能体设计。通过结合文本对话历史和用户先前的声学特征，它能在多轮交互中提供低延迟、连贯一致的语音响应。"
+
+### 加入我们
+
+ - 公众号："CrazyNET"
+
+### 关注CrazyNET公众号，获取更多关于MOSS-TTS-Realtime以及MossAudioTokenizer的信息和更新。
