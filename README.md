@@ -1,3 +1,5 @@
+[EN](README.md) | [中文版本](README_zh.md)
+
 # Moss Audio Tokenizer ONNX
 
 ![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)
@@ -412,4 +414,5 @@ if __name__ == "__main__":
  - WeChat Official Account: "CrazyNET"
 
 ### Follow the CrazyNET WeChat Official Account to get more information and updates about MOSS-TTS-Realtime and MossAudioTokenizer.
+
 
