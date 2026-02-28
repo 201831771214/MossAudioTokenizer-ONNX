@@ -31,6 +31,12 @@ MOSSAudioTokenizer 是一种基于 Cat（Causal Audio Tokenizer with Transformer
 
 ### Git仓库结构
 
+#### Clone仓库
+
+```shell
+git clone https://github.com/201831771214/MossAudioTokenizer-ONNX.git
+```
+
 ```shell
 ./MossAudioTokenizerDecoder-ONNX/
 ├── audio_tokens.npy
@@ -225,3 +231,4 @@ if __name__ == "__main__":
     sf.write(output_path, audio, sample_rate)
     logger.info(f"Audio waveform saved to {output_path} with sample rate {sample_rate}")
 ```
+
