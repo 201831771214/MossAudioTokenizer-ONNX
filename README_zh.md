@@ -56,7 +56,7 @@ modelscope download --model KeanuX/MossAudioTokenizer-ONNX --local_dir ./
 │   ├── check_onnx.log
 │   └── run_onnx.log
 ├── models
-│   └── moss_audio_tokenizer_decoder_onnx
+│   └── moss_audio_tokenizer_onnx
 │       ├── 2005f62a-1458-11f1-80d4-cc28aa3bf0f5.data
 │       ├── 2799b6f6-1458-11f1-80d4-cc28aa3bf0f5.data
 │       ├── audio_tokenizer_decoder.onnx
