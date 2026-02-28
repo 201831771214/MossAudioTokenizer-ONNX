@@ -1,4 +1,4 @@
-[EN](README.md) | [中文版本](README_zh.md)
+[EN](README.md) | [ZH](README_zh.md)
 
 # Moss Audio Tokenizer ONNX
 
