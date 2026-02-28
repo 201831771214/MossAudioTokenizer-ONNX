@@ -9,7 +9,7 @@ import sys
 import logging
 
 logger = logging.getLogger(__name__)
-file_handler = logging.FileHandler("./logs/run_onnx.log", mode="w", encoding="utf-8")
+file_handler = logging.FileHandler("./logs/run_decoder.log", mode="w", encoding="utf-8")
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(formatter)
 file_handler.setLevel(logging.INFO)
@@ -81,7 +81,7 @@ class AudioTokenizerDecoder:
         return full_audio, 24000
     
 test_audio_tokens = "./audio_tokens.npy"
-model_path = "./models/moss_tts/audio_tokenizer_decoder.onnx"
+model_path = "./models/moss_audio_tokenizer_decoder_onnx/audio_tokenizer_decoder.onnx"
 output_path = "generated_audio.wav"
 
 if __name__ == "__main__":
