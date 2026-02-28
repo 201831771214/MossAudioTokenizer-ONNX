@@ -1,0 +1,222 @@
+# Moss Audio Tokenizer ONNX
+
+## 模型简介
+
+MOSSAudioTokenizer 是一种基于 Cat（Causal Audio Tokenizer with Transformer）架构的统一离散音频分词器。该模型参数量达到 16 亿，可作为统一的离散接口，同时实现无损质量重建和高层语义对齐。
+
+主要特性：
+
+    极致压缩与可变比特率：将 24kHz 原始音频压缩至极低的 12.5Hz 帧率。通过 32 层残差矢量量化器（RVQ），支持从 0.125kbps 到 4kbps 的宽范围比特率下的高保真重建。
+    纯 Transformer 架构：模型采用“无 CNN”的同质架构，完全由因果 Transformer 模块构建。编码器与解码器合计 16 亿参数，确保卓越的可扩展性，并支持低延迟流式推理。
+    大规模通用音频训练：在 300 万小时多样化音频数据上进行训练，能够出色地编码和重建所有音频领域内容，包括语音、音效和音乐。
+    统一的语义-声学表征：在实现当前最优重建质量的同时，Cat 生成的离散 token 具有“丰富的语义”，非常适合下游任务，如语音理解（ASR）和语音合成（TTS）。
+    完全从零训练：Cat 不依赖任何预训练编码器（如 HuBERT 或 Whisper），也不使用教师模型蒸馏。所有表征均从原始数据中自主学习。
+    端到端联合优化：所有组件——包括编码器、量化器、解码器、判别器，以及用于语义对齐的仅解码器 LLM——均在单一统一训练流程中联合优化。
+
+总结： 通过结合简洁可扩展的架构与大规模数据，Cat 架构突破了传统音频分词器的瓶颈，为下一代原生音频基础模型提供了鲁棒、高保真且语义扎实的接口。
+
+本仓库包含了 MOSSAudioTokenizer Decoder 的 ONNX 模型文件，以及使用该模型进行音频解码的 Py 代码。
+
+![架构图](./rep_sources/arch.png)
+
+
+## 开源Git仓库
+
+ - GitHub: [https://github.com/201831771214/MossAudioTokenizer-ONNX](https://github.com/201831771214/MossAudioTokenizer-ONNX)
+
+### 仓库结构
+
+```shell
+./MossAudioTokenizerDecoder-ONNX/
+├── audio_tokens.npy
+├── check_onnx.py
+├── export_audio_tokenizer.py
+├── export_model_info.py
+├── generated_audio.wav
+├── infos
+│   └── audio_tokenizer_decoder.info
+├── logs
+│   ├── check_onnx.log
+│   └── run_onnx.log
+├── models
+│   └── moss_audio_tokenizer_decoder_onnx
+│       ├── audio_tokenizer_decoder.onnx
+│       └── f73227e2-1442-11f1-80d4-cc28aa3bf0f5.data
+├── moss_audio_tokenizer
+│   ├── config.json
+│   ├── configuration_moss_audio_tokenizer.py
+│   ├── demo
+│   │   ├── demo_gt.wav
+│   │   └── test_reconstruction.py
+│   ├── images
+│   │   ├── arch.png
+│   │   ├── metrics_on_librispeech_test_clean.png
+│   │   ├── mosi-logo.png
+│   │   ├── OpenMOSS_Logo.png
+│   │   └── reconstruct_comparison_table.png
+│   ├── __init__.py
+│   ├── LICENSE
+│   ├── modeling_moss_audio_tokenizer.py
+│   ├── __pycache__
+│   │   ├── configuration_moss_audio_tokenizer.cpython-310.pyc
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── modeling_moss_audio_tokenizer.cpython-310.pyc
+│   ├── README.md
+│   └── requirements.txt
+├── moss_extra
+│   ├── audio_tokenizer_decoder.py
+│   └── __pycache__
+│       └── audio_tokenizer_decoder.cpython-310.pyc
+├── README.md
+├── README_ModelScope.md
+├── rep_sources
+│   └── arch.png
+├── requirements.txt
+└── run_onnx.py
+
+12 directories, 34 files
+```
+
+## 使用方法
+
+### 模型信息
+
+```txt
+============================================================
+ONNX模型基本信息
+============================================================
+模型文件路径: ./models/moss_audio_tokenizer_decoder_onnx/audio_tokenizer_decoder.onnx
+ONNX版本: 7
+生产者信息: pytorch 2.8.0
+模型版本: 0
+描述: 
+
+============================================================
+模型输入信息 (共 1 个输入)
+============================================================
+Input 1: audio_codes
+  数据类型: int32
+  形状: [0, 0, 0]
+
+============================================================
+模型输出信息 (共 1 个输出)
+============================================================
+Output 1: audio
+  数据类型: float32
+  形状: [0, 0]
+```
+
+详细信息请参考: [ONNX模型信息](https://github.com/201831771214/MossAudioTokenizer-ONNX/infos/)
+
+### 安装依赖
+
+```shell
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 快速入门
+
+```python
+import onnxruntime as ort
+import numpy as np
+from numpy.typing import NDArray
+import soundfile as sf
+from typing import Tuple
+import os
+import sys
+
+import logging
+
+logger = logging.getLogger(__name__)
+file_handler = logging.FileHandler("./logs/run_onnx.log", mode="w", encoding="utf-8")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+file_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+logger.setLevel(logging.INFO)
+
+class AudioTokenizerDecoder:
+    def __init__(self, model_path:str, device:str="cuda"):
+        self.model_path = model_path
+        self.device = device.lower()
+        
+        logger.info(f"All available providers: {ort.get_available_providers()}")
+        if device == "cuda" and "CUDAExecutionProvider" in ort.get_available_providers():
+            self.providers = ["CUDAExecutionProvider"]
+        elif device == "cpu" and "CPUExecutionProvider" in ort.get_available_providers():
+            self.providers = ["CPUExecutionProvider"]
+        else:
+            logger.warning(f"Device {device} is not supported. Fall back to CPU.")
+            self.providers = ["CPUExecutionProvider"]
+        
+        # Configure session options for memory optimization
+        sess_options = ort.SessionOptions()
+        sess_options.enable_mem_pattern = False
+        sess_options.enable_mem_reuse = False
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+        
+        self.session = ort.InferenceSession(model_path, providers=self.providers, sess_options=sess_options)
+        
+        self.input_names = [input.name for input in self.session.get_inputs()]
+        self.output_names = [output.name for output in self.session.get_outputs()]
+        logger.info(f"Session Input names: {self.input_names}")
+        logger.info(f"Session Output names: {self.output_names}")
+        
+    def __decode(self, audio_tokens:np.ndarray) -> Tuple[np.ndarray, int]:
+        """Decode audio tokens into audio waveform.
+
+        Args:
+            audio_tokens (np.ndarray): Audio tokens of shape (batch_size, channels, audio_tokens_len).
+
+        Returns:
+            audio (np.ndarray): Audio waveform of shape (batch_size, audio_len).
+            sample_rate (int): Sample rate of the audio waveform.
+            
+        """
+        input_spec = {
+            self.input_names[0]: audio_tokens
+        }
+        
+        audio = self.session.run(self.output_names, input_spec)[0]
+        return audio, 24000
+
+    # TODO: Both support dynamic input shape and static input shape, when the input shape is static, the chunk_size should be the same as the audio_tokens_len.
+    def decode_chunked(self, audio_tokens:np.ndarray, chunk_size:int=200) -> Tuple[np.ndarray, int]:
+        """Decode audio tokens in chunks to manage memory."""
+        batch_size, channels, seq_len = audio_tokens.shape
+        
+        if seq_len <= chunk_size:
+            return self.__decode(audio_tokens)
+        
+        # Process in chunks
+        chunks = []
+        for i in range(0, seq_len, chunk_size):
+            chunk = audio_tokens[:, :, i:i+chunk_size]
+            chunk_audio, _ = self.__decode(chunk)
+            chunks.append(chunk_audio)
+        
+        # Concatenate the results (this might need adjustment based on model behavior)
+        full_audio = np.concatenate(chunks, axis=-1)  # This depends on the output shape
+        return full_audio, 24000
+    
+test_audio_tokens = "./audio_tokens.npy"
+model_path = "./models/moss_tts/audio_tokenizer_decoder.onnx"
+output_path = "generated_audio.wav"
+
+if __name__ == "__main__":
+    audio_decoder = AudioTokenizerDecoder(model_path)
+    audio_tokens:NDArray = np.load(test_audio_tokens)
+    if audio_tokens.ndim != 3:
+        audio_tokens = np.expand_dims(audio_tokens, axis=0).astype(np.int32)
+    logger.info(f"Audio tokens shape: {audio_tokens.shape}")
+    
+    audio, sample_rate = audio_decoder.decode_chunked(audio_tokens)
+    logger.info(f"Generated Audio shape: {audio.shape}")
+    
+    if audio.ndim == 2:
+        audio = audio[0]
+    
+    sf.write(output_path, audio, sample_rate)
+    logger.info(f"Audio waveform saved to {output_path} with sample rate {sample_rate}")
+```
