@@ -1,5 +1,6 @@
 from moss_audio_tokenizer.modeling_moss_audio_tokenizer import MossAudioTokenizerModel
 from moss_extra.audio_tokenizer_decoder import AudioTokenizerDecoderWrapper
+from moss_extra.audio_tokenizer_encoder import AudioTokenizerEncoderWrapper
 import torch
 from typing import Tuple
 import argparse
@@ -14,6 +15,61 @@ EXTERNAL_DATA_THRESHOLD = 4 * 1024 * 1024 * 1024 # 4GB
 def build_audio_tokenizer_decoder_dummy_input(batch_size:int=1, channels:int=16, sequence_length:int=237) -> Tuple[torch.Tensor]:
     audio_codes = torch.randint(0, 1000, (batch_size, channels, sequence_length), dtype=torch.int32)
     return (audio_codes, )
+
+def build_audio_tokenizer_encoder_dummy_input(batch_size:int=1, channels:int=1, sequence_length:int=130560) -> Tuple[torch.Tensor]:
+    input_values = torch.randn(batch_size, channels, sequence_length, dtype=torch.float32)
+    return (input_values, )
+
+def export_audio_tokenizer_encoder(
+    audio_tokenizer:MossAudioTokenizerModel,
+    output_path:str,
+    opset_version:int=14,
+    dummy_input:Tuple[torch.Tensor]=build_audio_tokenizer_encoder_dummy_input(),
+    is_dynamic:bool=True
+):
+    audio_tokenizer_encoder = AudioTokenizerEncoderWrapper(audio_tokenizer).eval()
+    
+    input_names = ["input_values"]
+    output_names = ["audio_codes", "audio_codes_lengths", "encoder_hidden_states"]
+    
+    if is_dynamic:
+        dynamic_axes = {
+            "input_values": {0: "batch_size", 1: "channels", 2: "sequence_length"},
+        }
+    else:
+        dynamic_axes = {}
+
+    try:
+        os.makedirs(os.path.join(output_path, "encoder"), exist_ok=True)
+        save_root = os.path.join(output_path, "encoder")
+        model_save_path = os.path.join(output_path, "encoder", "audio_tokenizer_encoder.onnx")
+        torch.onnx.export(
+            model=audio_tokenizer_encoder,
+            args=dummy_input,
+            f=model_save_path,
+            export_params=True,
+            input_names=input_names,
+            output_names=output_names,
+            opset_version=opset_version,
+            dynamic_axes=dynamic_axes,
+            external_data=True,
+            do_constant_folding=True,
+            export_modules_as_functions=False
+        )
+        # combine external data into main onnx file for easier loading in some runtimes (optional, can keep as external if preferred)
+        model_proto = onnx.load(model_save_path)
+        
+        load_external_data_for_model(model_proto, save_root)
+        convert_model_to_external_data(
+            model_proto,
+            all_tensors_to_one_file=True,
+            convert_attribute=True
+        )
+        onnx.save(model_proto, os.path.join(output_path, "audio_tokenizer_encoder.onnx"), save_as_external_data=True, all_tensors_to_one_file=True, size_threshold=EXTERNAL_DATA_THRESHOLD)
+        print(f"Exported audio tokenizer encoder to {os.path.join(output_path, 'audio_tokenizer_encoder.onnx')}")
+    except Exception as e:
+        print(f"Error exporting audio tokenizer encoder: {e}")
+        raise e
 
 def export_audio_tokenizer_decoder(
     audio_tokenizer:MossAudioTokenizerModel,
@@ -35,9 +91,9 @@ def export_audio_tokenizer_decoder(
         dynamic_axes = {}
     
     try:
-        os.makedirs(os.path.join(output_path, "tokenizer"), exist_ok=True)
-        save_root = os.path.join(output_path, "tokenizer")
-        model_save_path = os.path.join(output_path, "tokenizer", "audio_tokenizer_decoder.onnx")
+        os.makedirs(os.path.join(output_path, "decoder"), exist_ok=True)
+        save_root = os.path.join(output_path, "decoder")
+        model_save_path = os.path.join(output_path, "decoder", "audio_tokenizer_decoder.onnx")
         torch.onnx.export(
             model=audio_tokenizer_decoder,
             args=dummy_input,
@@ -73,7 +129,7 @@ default_model_path = "./models/Moss-Audio-Tokenizer/"
 default_output_path = "./models/moss_tts/"
 
 if __name__ == "__main__":
-    msg_info = f"Export audio tokenizer decoder to {default_output_path} by default."
+    msg_info = f"Export audio tokenizer encoder and decoder to {default_output_path} by default."
     usg_info = """
     Usage:
         python export_audio_tokenizer.py [-m MODEL_PATH] [-o OUTPUT_PATH] [--opset OPSET] [-id] [-b BATCH_SIZE] [-c CHANNELS] [-s SEQUENCE_LENGTH] [-d CHUNK_DURATION]
@@ -85,8 +141,10 @@ if __name__ == "__main__":
     parser.add_argument("--opset", type=int, default=14, help="ONNX opset version.")
     parser.add_argument("-id", "--is_dynamic", action="store_true", help="Whether to export the model with dynamic axes.")
     parser.add_argument("-b", "--batch_size", type=int, default=1, help="Batch size for dummy input.")
-    parser.add_argument("-c", "--channels", type=int, default=16, help="Channels for dummy input.")
-    parser.add_argument("-s", "--sequence_length", type=int, default=237, help="Sequence length for dummy input.")
+    parser.add_argument("-dc", "--decoder_channels", type=int, default=16, help="Channels for decoder dummy input.")
+    parser.add_argument("-ds", "--decoder_sequence_length", type=int, default=237, help="Sequence length for decoder dummy input.")
+    parser.add_argument("-ec", "--encoder_channels", type=int, default=1, help="Channels for encoder dummy input.")
+    parser.add_argument("-es", "--encoder_sequence_length", type=int, default=300, help="Sequence length for encoder dummy input.")
     args = parser.parse_args()
     
     os.makedirs(os.path.dirname(args.output_path), exist_ok=True)
@@ -95,16 +153,30 @@ if __name__ == "__main__":
     
     audio_tokenizer.eval().cpu()
     
-    dummy_inputs = build_audio_tokenizer_decoder_dummy_input(
+    decoder_dummy_inputs = build_audio_tokenizer_decoder_dummy_input(
         batch_size=args.batch_size,
-        channels=args.channels,
-        sequence_length=args.sequence_length,
+        channels=args.decoder_channels,
+        sequence_length=args.decoder_sequence_length,
     )
     
     export_audio_tokenizer_decoder(
         audio_tokenizer=audio_tokenizer,
         output_path=args.output_path,
         opset_version=args.opset,
-        dummy_input=dummy_inputs,
+        dummy_input=decoder_dummy_inputs,
+        is_dynamic=args.is_dynamic
+    )
+    
+    encoder_dummy_inputs = build_audio_tokenizer_encoder_dummy_input(
+        batch_size=args.batch_size,
+        channels=args.encoder_channels,
+        sequence_length=args.encoder_sequence_length,
+    )
+    
+    export_audio_tokenizer_encoder(
+        audio_tokenizer=audio_tokenizer,
+        output_path=args.output_path,
+        opset_version=args.opset,
+        dummy_input=encoder_dummy_inputs,
         is_dynamic=args.is_dynamic
     )
